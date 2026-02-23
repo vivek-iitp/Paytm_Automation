@@ -1,0 +1,48 @@
+name: CI pipeline
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+env:
+  IMAGE_API: dotnet-api
+  IMAGE_UI: angular-ui
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '7.0.x'
+      - name: Restore API
+        run: dotnet restore ./dotnet-api --configuration Release
+
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18.x'
+      - name: Install UI dependencies
+        run:  cd frontend && npm install
+      - name: Build API
+        run:  cd frontend && npm run build
+
+      - name: set Tag
+        run: echo "TAG=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - name: Build API Docker image
+        run: docker build -t $IMAGE_API:${{ env.TAG }} -f ./backend
+      - name: Build UI Docker image
+        run: docker build -t $IMAGE_UI:${{ env.TAG }} -f ./frontend
+
+      - name: Tag images with latest
+        run: |
+          docker tag $IMAGE_API:${{ env.TAG }} $IMAGE_API:latest
+          docker tag $IMAGE_UI:${{ env.TAG }} $IMAGE_UI:latest
+
+      - name: push
+        run: echo "Pushing images to registry..."
+
+        
